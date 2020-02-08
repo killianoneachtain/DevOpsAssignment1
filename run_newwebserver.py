@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import boto3
 import botocore
 import subprocess
@@ -8,12 +9,20 @@ import time
 from datetime import datetime
 
 # Function to get current date:time format
-#
 def get_datetime():
     # Use current date/time to get a jpg file name format (day month year Hour Minute Second)
     now = datetime.now()    
     current = now.strftime("%d%m%y%H%M%S")
     return current
+
+# Function to copy image to local directory
+def copy_image():
+		try:
+				process = subprocess.run('curl http://devops.witdemo.net/image.jpg > test.jpg', shell=True, stdout=subprocess.PIPE)
+		except Exception as error:
+				print (error)
+		object_name = 'test.jpg'
+		return object_name
 
 
 ec2 = boto3.resource('ec2')
@@ -88,20 +97,14 @@ while checkCount != "b\'4\\n\'" :
 # Unblock all the permissions and allow image to be referenced in EC2 instance web site
 #-----------------
 
-bucket_name = 'KillianON'
+bucket_name = 'killian'+ get_datetime()
+print ("\nThe bucket_name is : " + bucket_name +"\n")
+object_name = copy_image()
 
-try:
-		process = subprocess.run('curl http://devops.witdemo.net/image.jpg > test.jpg', shell=True, stdout=subprocess.PIPE)
-except Exception as error:
-		print (error)
-
-object_name = 'test.jpg'
 
 # create bucket here
 try:
-		name = bucket_name + get_datetime()
-		response = s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': 'eu-west-1'}, ACL='public-read-write')
-		bucket_name = name
+		response = s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration={'LocationConstraint': 'eu-west-1'}, ACL='public-read-write')
 except Exception as error:
 		print (error)
 
@@ -119,7 +122,7 @@ except Exception as error:
 
 location = boto3.client('s3').get_bucket_location(Bucket=bucket_name)['LocationConstraint']
 
-url = "https://s3-%s.amazonaws.com/%s/%s" % (location, bucket_name, object_name)
+url = "https://%s.s3-%s.amazonaws.com/%s" % (bucket_name,location, object_name)
 
 	
 #------- SSH Routine -----------
@@ -132,7 +135,7 @@ print ("Applying update and install commands via SSH...")
 
 ssh_command = 'ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s \'sudo ' % (keyName, instanceIP)
 
-image_code = "echo \"<img src=" + url +"\" >> /var/www/html/index.html'"
+image_code = "echo \"<img src=" + url + ">\" >> /var/www/html/index.html'"
 
 cmdList = ["yum update -y'", "yum install httpd -y'", "systemctl enable httpd'", "systemctl start httpd'", "chmod o+w /var/www/html'", "echo \"<h2>Test page</h2>Instance ID: \" > /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/instance-id/ >> /var/www/html/index.html'", "echo \"<br>Availability zone: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/placement/availability-zone/ >> /var/www/html/index.html'", "echo \"<br>IP address: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 >> /var/www/html/index.html'", "echo \"<hr>Here is an image that I have stored on S3: <br>\" >> /var/www/html/index.html'", image_code]
 
@@ -149,6 +152,8 @@ for index in range(len(cmdList)):
 url = 'http://' + instanceIP
 subprocess.call('firefox '+ url, shell=True)
 #subprocess.call('firefox '+url, shell=True)
+
+os.remove("test.jpg")
 
 
 
