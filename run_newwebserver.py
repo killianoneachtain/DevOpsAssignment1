@@ -88,7 +88,7 @@ while checkCount != "b\'4\\n\'" :
 # Unblock all the permissions and allow image to be referenced in EC2 instance web site
 #-----------------
 
-bucket_name = 'KillianON' + get_datetime()
+bucket_name = 'KillianON'
 
 try:
 		process = subprocess.run('curl http://devops.witdemo.net/image.jpg > test.jpg', shell=True, stdout=subprocess.PIPE)
@@ -99,10 +99,15 @@ object_name = 'test.jpg'
 
 # create bucket here
 try:
-		response = s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration={'LocationConstraint': 'eu-west-1'}, ACL='public-read')
-		print (response)
+		name = bucket_name + get_datetime()
+		response = s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': 'eu-west-1'}, ACL='public-read-write')
+		bucket_name = name
 except Exception as error:
 		print (error)
+
+time.sleep(18)
+print("\nWaiting for the S3 Bucket to be set up. \nPlease allow 15 seconds.\n")
+
 
 # put image in the bucket here
 
