@@ -3,7 +3,22 @@ import boto3
 import botocore
 import subprocess
 
+import sys
+import time
+
+# Function to get current date:time format
+#
+def get_datetime():
+    # Use current date/time to get a jpg file name format (day month year Hour Minute Second)
+    now = datetime.now()    
+    current = now.strftime("%d%m%y%H%M%S")
+    return current
+
+
 ec2 = boto3.resource('ec2')
+s3 = boto3.resource("s3")
+
+
 instance = ec2.create_instances(
     ImageId='ami-0713f98de93617bb4',
     KeyName='kon_keypair',
@@ -66,7 +81,41 @@ while checkCount != "b\'4\\n\'" :
 					break
 		except Exception as error:
 				print (error)		
-		
+
+
+#------- Create S3 Bucket with an image -----
+# Unblock all the permissions and allow image to be referenced in EC2 instance web site
+#-----------------
+
+bucket_name = 'KillianON' + get_datetime()
+
+try:
+		process = subprocess.run('curl http://devops.witdemo.net/image.jpg > test.jpg', shell=True, stdout=subprocess.PIPE)
+except Exception as error:
+		print (error)
+
+object_name = 'test.jpg'
+
+# create bucket here
+try:
+		response = s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration={'LocationConstraint': 'eu-west-1'}, ACL='public-read')
+		print (response)
+except Exception as error:
+		print (error)
+
+# put image in the bucket here
+
+try:
+    	response = s3.Object(bucket_name, object_name).put(ACL='public-read', Body=open(object_name, 'rb'))
+    	print (response)
+except Exception as error:
+    	print (error)
+
+location = boto3.client('s3').get_bucket_location(Bucket=bucket_name)['LocationConstraint']
+
+url = "https://s3-%s.amazonaws.com/%s/%s" % (location, bucket_name, object_name)
+
+	
 #------- SSH Routine -----------
 # We proceed to SSH into the instance and perform update commands
 # as a root(SUDO) user. We exit on completion.
@@ -77,7 +126,9 @@ print ("Applying update and install commands via SSH...")
 
 ssh_command = 'ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s \'sudo ' % (keyName, instanceIP)
 
-cmdList = ["yum update -y'", "yum install httpd -y'", "systemctl enable httpd'", "systemctl start httpd'", "chmod  o+w /var/www/html'", "echo \"<h2>Test page</h2>Instance ID: \" > /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/instance-id/ >> /var/www/html/index.html'", "echo \"<br>Availability zone: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/placement/availability-zone/ >> /var/www/html/index.html'", "echo \"<br>IP address: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 >> /var/www/html/index.html'"]
+image_code = "echo \"<img src=" + url +"\" >> /var/www/html/index.html'"
+
+cmdList = ["yum update -y'", "yum install httpd -y'", "systemctl enable httpd'", "systemctl start httpd'", "chmod o+w /var/www/html'", "echo \"<h2>Test page</h2>Instance ID: \" > /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/instance-id/ >> /var/www/html/index.html'", "echo \"<br>Availability zone: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/placement/availability-zone/ >> /var/www/html/index.html'", "echo \"<br>IP address: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 >> /var/www/html/index.html'", "echo \"<hr>Here is an image that I have stored on S3: <br>\" >> /var/www/html/index.html'", image_code]
 
 for index in range(len(cmdList)):
 		try:	
@@ -88,10 +139,14 @@ for index in range(len(cmdList)):
 				print (error)
 
 
-url = 'http://' + instanceIP
 
-#subprocess.call('firefox '+ url, shell=True)
-subprocess.call('firefox '+url, shell=True)
+url = 'http://' + instanceIP
+subprocess.call('firefox '+ url, shell=True)
+#subprocess.call('firefox '+url, shell=True)
+
+
+
+
 
 
 
