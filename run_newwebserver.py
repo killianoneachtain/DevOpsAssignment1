@@ -51,18 +51,18 @@ instanceIP = instance.public_ip_address
 # are complete and both have been passed.
 #-----------------------------------------
 
+print ("\n\n Waiting for AWS Status Checks to Pass...\n\n")
+
 status_check_cmd = 'aws ec2 describe-instance-status --instance-id %s | egrep \'ok|passed\' | wc -l' % (instanceID)
 
 checkCount = ""
-
-counter
 
 while checkCount != "b\'4\\n\'" :
 		try:
 				process = subprocess.run(status_check_cmd, shell=True, stdout=subprocess.PIPE, stderr= subprocess.PIPE)
 				output = str(process.stdout)
 				if output == "b\'4\\n\'":
-					print ("2/2 AWS Checks Have Passed.\n\n")
+					print ("\n2/2 AWS Checks Have Passed.\n\n")
 					break
 		except Exception as error:
 				print (error)		
@@ -72,20 +72,30 @@ while checkCount != "b\'4\\n\'" :
 # as a root(SUDO) user. We exit on completion.
 #-----------------------------------------
 
-print ("
+print ("Applying update and install commands via SSH...")
 
 
-ssh_command = 'ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s ' % (keyName, instanceIP)
+ssh_command = 'ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s \'sudo ' % (keyName, instanceIP)
 
-cmdList = ["'sudo yum update -y'", "'sudo yum install httpd -y'", "'sudo systemctl enable httpd'", "'sudo systemctl start httpd'", "'echo \"<h2>Test page</h2>Instance ID: \" > /var/www/html/index.html'", "'curl --silent http://169.254.169.254/latest/meta-data/instance-id/ >> /var/www/html/index.html'", "'echo \"<br>Availability zone: \" >> /var/www/html/index.html'", "'curl --silent http://169.254.169.254/latest/meta-data/placement/availability-zone/ >> /var/www/html/index.html'", "'echo \"<br>IP address: \" >> /var/www/html/index.html'", "'curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 >> /var/www/html/index.html'"]
+cmdList = ["yum update -y'", "yum install httpd -y'", "systemctl enable httpd'", "systemctl start httpd'", "chmod  o+w /var/www/html'", "echo \"<h2>Test page</h2>Instance ID: \" > /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/instance-id/ >> /var/www/html/index.html'", "echo \"<br>Availability zone: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/placement/availability-zone/ >> /var/www/html/index.html'", "echo \"<br>IP address: \" >> /var/www/html/index.html'", "curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 >> /var/www/html/index.html'"]
 
 for index in range(len(cmdList)):
 		try:	
-				print ("Subprocess is : " + ssh_command + cmdList[index])
-				subprocess.run(ssh_command + cmdList[index] , shell=True)
-				print ("done")
+				print ("\nSubprocess is : " + ssh_command + cmdList[index] )
+				subprocess.run(ssh_command + cmdList[index] , shell=True, stdout=subprocess.PIPE)
+				print ("\n" + cmdList[index] + "\nCompleted!")
 		except Exception as error:
-				print (error)		
+				print (error)
+
+
+url = 'http://' + instanceIP
+
+#subprocess.call('firefox '+ url, shell=True)
+subprocess.call('firefox '+url, shell=True)
+
+
+
+	
 
 
 
